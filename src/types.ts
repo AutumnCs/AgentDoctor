@@ -1,3 +1,5 @@
+import type { TruthLevel } from './truth-level.js'
+
 /** Visibility of one tool in the runtime (from request/header.tools or a cordis registration). */
 export interface ToolVisibility {
   name: string
@@ -34,7 +36,7 @@ export interface RuntimeDiff {
 export interface ContextContribution {
   category: 'system' | 'messages' | 'tool-result' | 'tool-schema'
   tokens: number
-  level: 'fact' | 'derived' | 'unknown'
+  level: TruthLevel
   sourceId?: string
 }
 
