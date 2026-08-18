@@ -24,17 +24,17 @@ describe('classifyCordisCall', () => {
 })
 
 describe('runtime snapshot + diff', () => {
-  it('从 session log 重建出至少两个 runtime 快照', () => {
+  it('rebuilds at least two runtime snapshots from the session log', () => {
     const text = readFileSync('test/fixtures/cordis-tool-round.jsonl', 'utf-8')
     const snapshots = buildRuntimeSnapshots(parseSessionLog(text))
     expect(snapshots.length).toBeGreaterThanOrEqual(2)
     expect(snapshots[0].revision).toBeLessThan(snapshots[snapshots.length - 1].revision)
   })
 
-  it('diff 出 cordis_mount 新增的节点', () => {
+  it('diffs the node added by cordis_mount', () => {
     const text = readFileSync('test/fixtures/cordis-tool-round.jsonl', 'utf-8')
     const snapshots = buildRuntimeSnapshots(parseSessionLog(text))
-    // 找到 mount 前后的两个快照
+    // find the snapshots before/after mount
     const diff = diffRuntime(snapshots[0], snapshots[1])
     expect(diff.added.length).toBeGreaterThan(0)
     expect(diff.added.some(n => n.origin === 'dynamic')).toBe(true)

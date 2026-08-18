@@ -1,4 +1,4 @@
-import type { ParsedSession, SessionEvent } from './session-log.js'
+import type { ParsedSession } from './session-log.js'
 import type { RuntimeSnapshot, RuntimeNode } from './types.js'
 import { classifyCordisCall } from './cordis-verbs.js'
 
@@ -31,7 +31,7 @@ export function buildRuntimeSnapshots(parsed: ParsedSession): RuntimeSnapshot[] 
       const pkgName = String(args.name ?? args.code ?? `dyn-${revision}`)
       nodes.push({ id: `dyn-${revision}`, kind: 'plugin', origin: 'dynamic', name: pkgName })
     } else if (verb === 'stop' || verb === 'undefine') {
-      // unmount: remove the matching dynamic node (simplified: remove the last dynamic)
+      // unmount: remove the matching dynamic node (simplified: remove the first dynamic node)
       const idx = nodes.findIndex(n => n.origin === 'dynamic')
       if (idx >= 0) nodes = nodes.filter((_, i) => i !== idx)
     }
