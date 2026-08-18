@@ -5,7 +5,7 @@ import { diffRuntime } from './runtime-diff.js'
 import { attributeContext } from './context-attribution.js'
 
 function main(): void {
-  const path = process.argv[2] ?? 'test/fixtures/cordis-tool-round.jsonl'
+  const path = process.argv[2] ?? 'test/fixtures/advanced-toolchain.jsonl'
   console.log('╔══════════════════════════════════════╗')
   console.log('║  Agent Doctor — demo (SAMPLE DATA)   ║')
   console.log('╚══════════════════════════════════════╝')

@@ -12,6 +12,7 @@ function textOf(content: unknown): string {
   return content.map((block: any) => {
     if (typeof block?.text === 'string') return block.text
     if (block?.type === 'tool-result') return textOf(block.content)
+    if (block?.type === 'tool-call') return block.arguments ?? ''
     return ''
   }).join('\n')
 }

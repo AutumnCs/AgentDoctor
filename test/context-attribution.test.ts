@@ -29,6 +29,13 @@ describe('attributeContext', () => {
     expect(messages!.tokens).toBeGreaterThan(0)
   })
 
+  it('reports non-trivial magnitudes for dominant categories', () => {
+    const byCategory = (cat: string) => snapshot.contributions.find(c => c.category === cat)?.tokens ?? 0
+    expect(byCategory('system')).toBeGreaterThan(10000)
+    expect(byCategory('tool-schema')).toBeGreaterThan(5000)
+    expect(byCategory('messages')).toBeGreaterThan(400)
+  })
+
   it('labels all contributions as derived estimates (no fake precision)', () => {
     for (const c of snapshot.contributions) {
       expect(c.level).toBe('derived')
