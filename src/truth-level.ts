@@ -1,13 +1,13 @@
 export type TruthLevel = 'fact' | 'derived' | 'hypothesis' | 'unknown'
 
-/** 估计值：必须显式标注，禁止伪造精度。 */
+/** An estimated value: must be labeled explicitly, never presented with fake precision. */
 export interface Estimated {
   value: number
   estimated: true
   level: TruthLevel
 }
 
-/** 包装一个估计值。调用方必须知道这是 estimate，不是 fact。 */
+/** Wrap an estimated value. Callers must know this is an estimate, not a fact. */
 export function estimate(value: number, level: TruthLevel = 'derived'): Estimated {
   return { value, estimated: true, level }
 }

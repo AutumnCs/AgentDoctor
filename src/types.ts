@@ -1,27 +1,27 @@
-/** 一个工具在 runtime 里的可见性（来源：request/header.tools 或 cordis 注册）。 */
+/** Visibility of one tool in the runtime (from request/header.tools or a cordis registration). */
 export interface ToolVisibility {
   name: string
-  /** 事实级别：来自 request/header 是 fact，来自 cordis_define 是 derived。 */
+  /** Truth level: `fact` from request/header, `derived` from cordis_define. */
   level: 'fact' | 'derived'
 }
 
-/** runtime 拓扑里的一个节点：插件或服务。 */
+/** One node in the runtime topology: a plugin or service. */
 export interface RuntimeNode {
   id: string
   kind: 'plugin' | 'service' | 'tool'
-  /** cordis.yml 里是静态，cordis tool/call 里是动态。 */
+  /** `static` from cordis.yml, `dynamic` from a cordis tool/call. */
   origin: 'static' | 'dynamic'
   name: string
 }
 
-/** 某个时刻的 runtime 拓扑快照。 */
+/** A runtime topology snapshot at one revision. */
 export interface RuntimeSnapshot {
   revision: number
   nodes: RuntimeNode[]
   toolCount: number
 }
 
-/** 两个快照之间的变化，git diff 风格。 */
+/** The change between two snapshots, git-diff style. */
 export interface RuntimeDiff {
   from: number
   to: number
@@ -30,7 +30,7 @@ export interface RuntimeDiff {
   toolCountDelta: number
 }
 
-/** 一条 context 贡献：某个东西占了多少 token。 */
+/** One context contribution: how many tokens some component occupies. */
 export interface ContextContribution {
   category: 'system' | 'messages' | 'tool-result' | 'tool-schema'
   tokens: number
@@ -38,7 +38,7 @@ export interface ContextContribution {
   sourceId?: string
 }
 
-/** context 快照：总量 + 分项贡献。 */
+/** A context snapshot: total plus per-category contributions. */
 export interface ContextSnapshot {
   totalTokens: number
   contributions: ContextContribution[]
