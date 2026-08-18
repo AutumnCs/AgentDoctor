@@ -20,9 +20,10 @@ export interface ParsedSession {
 }
 
 /**
- * 解析 DSH session JSONL：首行是 session 头，后续每行是一个事件。
- * 只读、容错：某行不是合法 JSON 时跳过并记 warning，不抛异常。
- * 见 DESIGN.md 第 3 节「唯一事实源」。
+ * Parse a DSH session JSONL: the first line is the session header, each
+ * subsequent line is an event. Read-only and fault-tolerant: skip a
+ * non-JSON line with a warning instead of throwing.
+ * See DESIGN.md section 3 "single source of truth".
  */
 export function parseSessionLog(text: string): ParsedSession {
   const lines = text.split('\n').filter(line => line.trim().length > 0)
