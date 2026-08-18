@@ -30,18 +30,20 @@ describe('classifyCordisCall', () => {
 
 describe('runtime snapshot + diff', () => {
   it('rebuilds at least two runtime snapshots from the session log', () => {
-    const text = readFileSync('test/fixtures/cordis-tool-round.jsonl', 'utf-8')
+    const text = readFileSync('test/fixtures/advanced-toolchain.jsonl', 'utf-8')
     const snapshots = buildRuntimeSnapshots(parseSessionLog(text))
     expect(snapshots.length).toBeGreaterThanOrEqual(2)
     expect(snapshots[0].revision).toBeLessThan(snapshots[snapshots.length - 1].revision)
   })
 
-  it('diffs the node added by cordis_mount', () => {
-    const text = readFileSync('test/fixtures/cordis-tool-round.jsonl', 'utf-8')
+  it('diffs the node added by cordis_define and removed by cordis_undefine', () => {
+    const text = readFileSync('test/fixtures/advanced-toolchain.jsonl', 'utf-8')
     const snapshots = buildRuntimeSnapshots(parseSessionLog(text))
-    // find the snapshots before/after mount
-    const diff = diffRuntime(snapshots[0], snapshots[1])
-    expect(diff.added.length).toBeGreaterThan(0)
-    expect(diff.added.some(n => n.origin === 'dynamic')).toBe(true)
+    // define (seq 15) adds a dynamic node, undefine (seq 63) removes it
+    const addDiff = diffRuntime(snapshots[0], snapshots[1])
+    expect(addDiff.added.length).toBeGreaterThan(0)
+    expect(addDiff.added.some(n => n.origin === 'dynamic')).toBe(true)
+    const lastDiff = diffRuntime(snapshots[snapshots.length - 2], snapshots[snapshots.length - 1])
+    expect(lastDiff.removed.length).toBeGreaterThan(0)
   })
 })
