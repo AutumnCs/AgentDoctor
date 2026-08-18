@@ -8,6 +8,8 @@ export type CordisVerb = 'inspect' | 'define' | 'run' | 'stop' | 'undefine'
  */
 export const CORDIS_VERB_MAP: Record<string, CordisVerb> = {
   cordis_inspect: 'inspect',
+  cordis_inspect_self: 'inspect',   // real DSH on-disk fixture uses this
+  cordis_inspect_query: 'inspect',  // real DSH on-disk fixture uses this
   cordis_define: 'define',
   cordis_mount: 'run',     // legacy name, equivalent to run
   cordis_run: 'run',

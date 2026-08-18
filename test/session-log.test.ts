@@ -4,14 +4,14 @@ import { parseSessionLog } from '../src/session-log.js'
 
 describe('parseSessionLog', () => {
   it('parses the first line as the session header', () => {
-    const text = readFileSync('test/fixtures/cordis-tool-round.jsonl', 'utf-8')
+    const text = readFileSync('test/fixtures/advanced-toolchain.jsonl', 'utf-8')
     const parsed = parseSessionLog(text)
     expect(parsed.header.type).toBe('session')
-    expect(parsed.header.id).toBe('sess-0001')
+    expect(parsed.header.id).toBe('11111111-1111-4111-8111-111111111111')
   })
 
   it('parses all events and preserves seq order', () => {
-    const text = readFileSync('test/fixtures/cordis-tool-round.jsonl', 'utf-8')
+    const text = readFileSync('test/fixtures/advanced-toolchain.jsonl', 'utf-8')
     const parsed = parseSessionLog(text)
     expect(parsed.events.length).toBeGreaterThan(0)
     const seqs = parsed.events.map(e => e.seq)
@@ -19,11 +19,11 @@ describe('parseSessionLog', () => {
   })
 
   it('extracts cordis tool/call events', () => {
-    const text = readFileSync('test/fixtures/cordis-tool-round.jsonl', 'utf-8')
+    const text = readFileSync('test/fixtures/advanced-toolchain.jsonl', 'utf-8')
     const parsed = parseSessionLog(text)
     const cordisCalls = parsed.events.filter(e =>
       e.type === 'tool/call' && String(e.data.name).startsWith('cordis_'))
     expect(cordisCalls.length).toBeGreaterThan(0)
-    expect(cordisCalls.map(c => c.data.name)).toContain('cordis_inspect')
+    expect(cordisCalls.map(c => c.data.name)).toContain('cordis_define')
   })
 })

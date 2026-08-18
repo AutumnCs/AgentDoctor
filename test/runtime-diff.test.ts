@@ -21,6 +21,11 @@ describe('classifyCordisCall', () => {
     expect(classifyCordisCall('bash')).toBe(null)
     expect(classifyCordisCall('inspect_pr')).toBe(null)
   })
+
+  it('recognizes cordis_inspect_self and cordis_inspect_query as inspect', () => {
+    expect(classifyCordisCall('cordis_inspect_self')).toBe('inspect')
+    expect(classifyCordisCall('cordis_inspect_query')).toBe('inspect')
+  })
 })
 
 describe('runtime snapshot + diff', () => {
