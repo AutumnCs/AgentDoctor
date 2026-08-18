@@ -14,7 +14,7 @@
 - **唯一事实源**：任何诊断必须能从 DSH session log + cordis.yml 重建；本项目 SQLite/内存结构只是索引。
 - **Truthfulness**：所有 token 数值分四级 `fact | derived | hypothesis | unknown`，estimate 必须显式标注（`~` 前缀或 `estimated: true`），禁止伪造精度。
 - **cordis 动词识别必须数据驱动**：fixture 中是 `cordis_mount/unmount`，README 是 `cordis_define/run/stop/undefine`，存在版本漂移，故动词映射表放配置里，不写死。
-- **语言**：代码注释与 commit message 用英文；用户可见文案（demo 输出、README）用中文，但保留英文术语（runtime diff、context attribution）。
+- **语言**：全部英文（用户已拍板）——源码注释、commit message、README、demo 输出一律英文。
 - **禁止**：hook cordis 内部事件、自建 collector、依赖私有未导出 API。只消费 DSH 公开的 session log 格式。
 
 ---
@@ -115,30 +115,30 @@ export default defineConfig({
 - [ ] **Step 4: 写领域类型 src/types.ts**
 
 ```ts
-/** 一个工具在 runtime 里的可见性（来源：request/header.tools 或 cordis 注册）。 */
+/** Visibility of one tool in the runtime (from request/header.tools or a cordis registration). */
 export interface ToolVisibility {
   name: string
-  /** 事实级别：来自 request/header 是 fact，来自 cordis_define 是 derived。 */
+  /** Truth level: `fact` from request/header, `derived` from cordis_define. */
   level: 'fact' | 'derived'
 }
 
-/** runtime 拓扑里的一个节点：插件或服务。 */
+/** One node in the runtime topology: a plugin or service. */
 export interface RuntimeNode {
   id: string
   kind: 'plugin' | 'service' | 'tool'
-  /** cordis.yml 里是静态，cordis tool/call 里是动态。 */
+  /** `static` from cordis.yml, `dynamic` from a cordis tool/call. */
   origin: 'static' | 'dynamic'
   name: string
 }
 
-/** 某个时刻的 runtime 拓扑快照。 */
+/** A runtime topology snapshot at one revision. */
 export interface RuntimeSnapshot {
   revision: number
   nodes: RuntimeNode[]
   toolCount: number
 }
 
-/** 两个快照之间的变化，git diff 风格。 */
+/** The change between two snapshots, git-diff style. */
 export interface RuntimeDiff {
   from: number
   to: number
@@ -147,7 +147,7 @@ export interface RuntimeDiff {
   toolCountDelta: number
 }
 
-/** 一条 context 贡献：某个东西占了多少 token。 */
+/** One context contribution: how many tokens some component occupies. */
 export interface ContextContribution {
   category: 'system' | 'messages' | 'tool-result' | 'tool-schema'
   tokens: number
@@ -155,7 +155,7 @@ export interface ContextContribution {
   sourceId?: string
 }
 
-/** context 快照：总量 + 分项贡献。 */
+/** A context snapshot: total plus per-category contributions. */
 export interface ContextSnapshot {
   totalTokens: number
   contributions: ContextContribution[]
@@ -167,14 +167,14 @@ export interface ContextSnapshot {
 ```ts
 export type TruthLevel = 'fact' | 'derived' | 'hypothesis' | 'unknown'
 
-/** 估计值：必须显式标注，禁止伪造精度。 */
+/** An estimated value: must be labeled explicitly, never presented with fake precision. */
 export interface Estimated {
   value: number
   estimated: true
   level: TruthLevel
 }
 
-/** 包装一个估计值。调用方必须知道这是 estimate，不是 fact。 */
+/** Wrap an estimated value. Callers must know this is an estimate, not a fact. */
 export function estimate(value: number, level: TruthLevel = 'derived'): Estimated {
   return { value, estimated: true, level }
 }
@@ -246,14 +246,14 @@ import { readFileSync } from 'node:fs'
 import { parseSessionLog } from '../src/session-log.js'
 
 describe('parseSessionLog', () => {
-  it('解析首行为 session 头', () => {
+  it('parses the first line as the session header', () => {
     const text = readFileSync('test/fixtures/cordis-tool-round.jsonl', 'utf-8')
     const parsed = parseSessionLog(text)
     expect(parsed.header.type).toBe('session')
     expect(parsed.header.id).toBe('sess-0001')
   })
 
-  it('解析出所有事件并保留 seq 顺序', () => {
+  it('parses all events and preserves seq order', () => {
     const text = readFileSync('test/fixtures/cordis-tool-round.jsonl', 'utf-8')
     const parsed = parseSessionLog(text)
     expect(parsed.events.length).toBeGreaterThan(0)
@@ -261,7 +261,7 @@ describe('parseSessionLog', () => {
     expect(seqs).toEqual([...seqs].sort((a, b) => a - b))
   })
 
-  it('提取出 cordis tool/call 事件', () => {
+  it('extracts cordis tool/call events', () => {
     const text = readFileSync('test/fixtures/cordis-tool-round.jsonl', 'utf-8')
     const parsed = parseSessionLog(text)
     const cordisCalls = parsed.events.filter(e =>
@@ -302,9 +302,10 @@ export interface ParsedSession {
 }
 
 /**
- * 解析 DSH session JSONL：首行是 session 头，后续每行是一个事件。
- * 只读、容错：某行不是合法 JSON 时跳过并记 warning，不抛异常。
- * 见 DESIGN.md 第 3 节「唯一事实源」。
+ * Parse a DSH session JSONL: the first line is the session header, each
+ * subsequent line is an event. Read-only and fault-tolerant: skip a
+ * non-JSON line with a warning instead of throwing.
+ * See DESIGN.md section 3 "single source of truth".
  */
 export function parseSessionLog(text: string): ParsedSession {
   const lines = text.split('\n').filter(line => line.trim().length > 0)
@@ -373,18 +374,18 @@ import { describe, it, expect } from 'vitest'
 import { classifyCordisCall, CORDIS_VERB_MAP } from '../src/cordis-verbs.js'
 
 describe('classifyCordisCall', () => {
-  it('识别旧命名 cordis_mount / cordis_unmount', () => {
+  it('recognizes legacy cordis_mount / cordis_unmount', () => {
     expect(classifyCordisCall('cordis_mount')).toBe('run')
     expect(classifyCordisCall('cordis_unmount')).toBe('stop')
   })
 
-  it('识别新命名 cordis_run / cordis_stop / cordis_undefine', () => {
+  it('recognizes current cordis_run / cordis_stop / cordis_undefine', () => {
     expect(classifyCordisCall('cordis_run')).toBe('run')
     expect(classifyCordisCall('cordis_stop')).toBe('stop')
     expect(classifyCordisCall('cordis_undefine')).toBe('undefine')
   })
 
-  it('非 cordis 工具返回 null', () => {
+  it('returns null for non-cordis tools', () => {
     expect(classifyCordisCall('bash')).toBe(null)
     expect(classifyCordisCall('inspect_pr')).toBe(null)
   })
@@ -399,25 +400,25 @@ Expected: FAIL — `Cannot find module '../src/cordis-verbs.js'`
 - [ ] **Step 3: 写 src/cordis-verbs.ts 实现**
 
 ```ts
-/** cordis 自进化工具的动词语义（统一归一化）。 */
+/** The cordis self-modification tool verb semantics (normalized). */
 export type CordisVerb = 'inspect' | 'define' | 'run' | 'stop' | 'undefine'
 
 /**
- * cordis 动词映射表。数据驱动、可配置：DSH 自身在
- * cordis_mount/unmount（旧）与 cordis_define/run/stop/undefine（新）之间
- * 存在版本漂移，故不写死，统一归一化到语义动词。
+ * cordis verb mapping table. Data-driven and configurable: DSH itself drifts
+ * between cordis_mount/unmount (legacy) and cordis_define/run/stop/undefine
+ * (current), so do not hard-code — normalize both to the semantic verbs.
  */
 export const CORDIS_VERB_MAP: Record<string, CordisVerb> = {
   cordis_inspect: 'inspect',
   cordis_define: 'define',
-  cordis_mount: 'run',     // 旧命名，等价于 run
+  cordis_mount: 'run',     // legacy name, equivalent to run
   cordis_run: 'run',
   cordis_stop: 'stop',
-  cordis_unmount: 'stop',  // 旧命名，等价于 stop
+  cordis_unmount: 'stop',  // legacy name, equivalent to stop
   cordis_undefine: 'undefine',
 }
 
-/** 把一个 tool 名归类到 cordis 动词；非 cordis 工具返回 null。 */
+/** Classify a tool name into a cordis verb; return null for non-cordis tools. */
 export function classifyCordisCall(name: string): CordisVerb | null {
   return CORDIS_VERB_MAP[name] ?? null
 }
@@ -461,17 +462,17 @@ import { buildRuntimeSnapshots } from '../src/runtime-snapshot.js'
 import { diffRuntime } from '../src/runtime-diff.js'
 
 describe('runtime snapshot + diff', () => {
-  it('从 session log 重建出至少两个 runtime 快照', () => {
+  it('rebuilds at least two runtime snapshots from the session log', () => {
     const text = readFileSync('test/fixtures/cordis-tool-round.jsonl', 'utf-8')
     const snapshots = buildRuntimeSnapshots(parseSessionLog(text))
     expect(snapshots.length).toBeGreaterThanOrEqual(2)
     expect(snapshots[0].revision).toBeLessThan(snapshots[snapshots.length - 1].revision)
   })
 
-  it('diff 出 cordis_mount 新增的节点', () => {
+  it('diffs the node added by cordis_mount', () => {
     const text = readFileSync('test/fixtures/cordis-tool-round.jsonl', 'utf-8')
     const snapshots = buildRuntimeSnapshots(parseSessionLog(text))
-    // 找到 mount 前后的两个快照
+    // find the snapshots before/after mount
     const diff = diffRuntime(snapshots[0], snapshots[1])
     expect(diff.added.length).toBeGreaterThan(0)
     expect(diff.added.some(n => n.origin === 'dynamic')).toBe(true)
@@ -487,37 +488,41 @@ Expected: FAIL — `Cannot find module '../src/runtime-snapshot.js'`
 - [ ] **Step 3: 写 src/runtime-snapshot.ts**
 
 ```ts
-import type { ParsedSession, SessionEvent } from './session-log.js'
+import type { ParsedSession } from './session-log.js'
 import type { RuntimeSnapshot, RuntimeNode } from './types.js'
 import { classifyCordisCall } from './cordis-verbs.js'
 
 /**
- * 从 session log 重建 runtime 快照序列。
- * 静态基线（cordis.yml）在 Phase 0 先用空基线；动态变化来自 cordis tool/call。
- * 见 DESIGN.md「关键发现：DSH 的自进化是 5 个可枚举动词」。
+ * Rebuild the runtime snapshot sequence from the session log.
+ * Static baseline (cordis.yml) is an empty baseline in Phase 0; dynamic
+ * changes come from cordis tool/call events.
+ * See DESIGN.md "DSH self-evolution is 5 enumerable verbs".
+ *
+ * Only mutating verbs (run/define/stop/undefine) advance a revision; the
+ * read-only `inspect` verb is skipped (it produces no topology change).
  */
 export function buildRuntimeSnapshots(parsed: ParsedSession): RuntimeSnapshot[] {
   const snapshots: RuntimeSnapshot[] = []
   let revision = 0
   let nodes: RuntimeNode[] = []
 
-  // 初始快照
+  // initial snapshot
   snapshots.push({ revision, nodes: [...nodes], toolCount: nodes.filter(n => n.kind === 'tool').length })
 
   for (const event of parsed.events) {
     if (event.type !== 'tool/call') continue
     const name = String(event.data.name)
     const verb = classifyCordisCall(name)
-    if (verb === null) continue
+    if (verb === null || verb === 'inspect') continue
 
     revision++
     if (verb === 'run' || verb === 'define') {
-      // cordis_mount / cordis_run：解析出包名，记为动态节点
+      // cordis_mount / cordis_run: parse the package name, record a dynamic node
       const args = JSON.parse(String(event.data.arguments ?? '{}'))
       const pkgName = String(args.name ?? args.code ?? `dyn-${revision}`)
       nodes.push({ id: `dyn-${revision}`, kind: 'plugin', origin: 'dynamic', name: pkgName })
     } else if (verb === 'stop' || verb === 'undefine') {
-      // 卸载：移除对应动态节点（简化：移除最后一个 dynamic）
+      // unmount: remove the matching dynamic node (simplified: remove the last dynamic)
       const idx = nodes.findIndex(n => n.origin === 'dynamic')
       if (idx >= 0) nodes = nodes.filter((_, i) => i !== idx)
     }
@@ -533,7 +538,7 @@ export function buildRuntimeSnapshots(parsed: ParsedSession): RuntimeSnapshot[] 
 ```ts
 import type { RuntimeSnapshot, RuntimeDiff, RuntimeNode } from './types.js'
 
-/** 计算两个快照间的 git 风格 diff。 */
+/** Compute a git-style diff between two snapshots. */
 export function diffRuntime(a: RuntimeSnapshot, b: RuntimeSnapshot): RuntimeDiff {
   const aIds = new Set(a.nodes.map(n => n.id))
   const bIds = new Set(b.nodes.map(n => n.id))
@@ -582,7 +587,7 @@ import { parseSessionLog } from '../src/session-log.js'
 import { attributeContext } from '../src/context-attribution.js'
 
 describe('attributeContext', () => {
-  it('从 request/header 提取 system 与 tool-schema 贡献', () => {
+  it('extracts system and tool-schema contributions from request/header', () => {
     const text = readFileSync('test/fixtures/cordis-tool-round.jsonl', 'utf-8')
     const snapshot = attributeContext(parseSessionLog(text))
     const cats = snapshot.contributions.map(c => c.category)
@@ -590,7 +595,7 @@ describe('attributeContext', () => {
     expect(cats).toContain('tool-schema')
   })
 
-  it('tool-schema 贡献是 estimate 而非精确值', () => {
+  it('labels tool-schema contribution as an estimate, not exact', () => {
     const text = readFileSync('test/fixtures/cordis-tool-round.jsonl', 'utf-8')
     const snapshot = attributeContext(parseSessionLog(text))
     const schema = snapshot.contributions.find(c => c.category === 'tool-schema')
@@ -610,15 +615,16 @@ Expected: FAIL — `Cannot find module '../src/context-attribution.js'`
 import type { ParsedSession } from './session-log.js'
 import type { ContextSnapshot, ContextContribution } from './types.js'
 
-/** 粗略 token 估算：中文按字符、英文按空格分词的 1.5 倍，作为 derived estimate。 */
+/** Rough token estimate: chars / 1.5, as a derived estimate. */
 function roughTokens(text: string): number {
   return Math.round(text.length / 1.5)
 }
 
 /**
- * 从 request/header + tool/result 归因 context 构成。
- * 重要：token 归因都是 estimate（DSH tokenMeter 只给 total，不给语义分项），
- * 必须用 level: 'derived' 标注，禁止伪造精度。见 DESIGN.md 第 9 节。
+ * Attribute context composition from request/header + tool/result.
+ * Important: all token attribution is an estimate (DSH tokenMeter gives only
+ * a total, not semantic breakdown), so label it level: 'derived' — never
+ * present fake precision. See DESIGN.md section 9.
  */
 export function attributeContext(parsed: ParsedSession): ContextSnapshot {
   const contributions: ContextContribution[] = []
@@ -674,7 +680,7 @@ git commit -m "feat: context attribution from header + tool results (derived est
 
 **Interfaces:**
 - Consumes: `parseSessionLog`, `buildRuntimeSnapshots`, `diffRuntime`, `attributeContext`（Task 2/4/5）
-- Produces: 可运行的 `npm run demo`，输出中文 SAMPLE 归因 + runtime diff。
+- Produces: a runnable `npm run demo` that prints a SAMPLE attribution + runtime diff.
 
 - [ ] **Step 1: 写 src/demo.ts**
 
@@ -696,8 +702,8 @@ function main(): void {
   console.log(`Events:  ${parsed.events.length}`)
 
   const snapshots = buildRuntimeSnapshots(parsed)
-  console.log(`\n── Runtime 快照 ──`)
-  console.log(`共 ${snapshots.length} 个快照 (revision 0 → ${snapshots[snapshots.length - 1].revision})`)
+  console.log(`\n── Runtime snapshots ──`)
+  console.log(`${snapshots.length} snapshots (revision 0 → ${snapshots[snapshots.length - 1].revision})`)
 
   for (let i = 1; i < snapshots.length; i++) {
     const d = diffRuntime(snapshots[i - 1], snapshots[i])
@@ -708,8 +714,8 @@ function main(): void {
   }
 
   const ctx = attributeContext(parsed)
-  console.log(`\n── Context 归因 (估算) ──`)
-  console.log(`总计 ~${ctx.totalTokens} tokens (estimated)`)
+  console.log(`\n── Context attribution (estimate) ──`)
+  console.log(`total ~${ctx.totalTokens} tokens (estimated)`)
   for (const c of ctx.contributions) {
     console.log(`  ${c.category.padEnd(14)} ~${c.tokens} (${c.level})`)
   }
@@ -721,32 +727,34 @@ main()
 - [ ] **Step 2: 跑 demo 确认能输出**
 
 Run: `cd /g/AgentDoctor && npx tsx src/demo.ts`
-Expected: 无异常，输出 session、runtime 快照、context 归因三块内容。
+Expected: no error; prints session, runtime snapshots, context attribution.
 
-- [ ] **Step 3: 写 README.md（中文，明确 SAMPLE 标注）**
+- [ ] **Step 3: 写 README.md（英文，明确 SAMPLE 标注）**
 
 ```markdown
 # Agent Doctor
 
-**git for your agent** —— 把 DeepSeek Harness 的强可观测性，从「能看到」翻译成「能看懂」。
+**git for your agent** — translate DeepSeek Harness's strong observability
+from "can see" to "can understand".
 
-> ⚠️ 当前为 **Phase 0 spike**：demo 输出基于 `test/fixtures/` 的
-> **SAMPLE DATA**，用于验证核心能力，不代表真实运行数据。
+> ⚠️ Current status: **Phase 0 spike**. The demo output is based on
+> **SAMPLE DATA** in `test/fixtures/` — it validates core capability, not
+> real run data.
 
-## 快速开始
+## Quick start
 
 ```bash
 npm install
-npm run demo   # 输出 SAMPLE 归因 + runtime diff
-npm test       # 跑全部单元测试
+npm run demo   # print a SAMPLE attribution + runtime diff
+npm test       # run all unit tests
 ```
 
-## 核心能力（V1 范围）
+## Core capability (V1 scope)
 
-1. **runtime diff**：从 cordis 动词（mount/unmount/run/stop）重建「agent 改了什么」。
-2. **context attribution**：回答「context 为什么这么大」（所有 token 均为 estimate，显式标注）。
+1. **runtime diff**: rebuild "what the agent changed" from cordis verbs (mount/unmount/run/stop).
+2. **context attribution**: answer "why is my context this large" (all tokens are estimates, explicitly labeled).
 
-详见 [DESIGN.md](DESIGN.md)。
+See [DESIGN.md](DESIGN.md).
 ```
 
 - [ ] **Step 4: 全量测试 + typecheck**
