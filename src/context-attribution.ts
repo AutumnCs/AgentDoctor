@@ -69,5 +69,19 @@ export function attributeContext(parsed: ParsedSession): ContextSnapshot {
   }
   add('messages', messagesTokens)
 
-  return { totalTokens: total, contributions }
+  // FACT total: billed input from the last assistant/message usage (DSH/provider reported)
+  let factTotalTokens: number | undefined
+  for (let i = parsed.events.length - 1; i >= 0; i--) {
+    const e = parsed.events[i]
+    if (e.type !== 'assistant/message') continue
+    const usage = (e.data as any).usage
+    if (usage && typeof usage.inputTokens === 'number') {
+      factTotalTokens = (usage.inputTokens ?? 0)
+        + (usage.cacheReadTokens ?? 0)
+        + (usage.cacheWriteTokens ?? 0)
+      break
+    }
+  }
+
+  return { totalTokens: total, ...(factTotalTokens !== undefined ? { factTotalTokens } : {}), contributions }
 }

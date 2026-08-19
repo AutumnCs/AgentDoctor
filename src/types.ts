@@ -42,6 +42,9 @@ export interface ContextContribution {
 
 /** A context snapshot: total plus per-category contributions. */
 export interface ContextSnapshot {
+  /** Derived sum of per-category estimates (chars/1.5 proportion). */
   totalTokens: number
+  /** FACT: billed input reported by DSH/provider (inputTokens + cacheReadTokens + cacheWriteTokens). Absent when no usage recorded. */
+  factTotalTokens?: number
   contributions: ContextContribution[]
 }

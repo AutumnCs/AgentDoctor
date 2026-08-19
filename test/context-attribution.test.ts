@@ -42,3 +42,19 @@ describe('attributeContext', () => {
     }
   })
 })
+
+describe('attributeContext on real-usage fixture', () => {
+  const text = readFileSync('test/fixtures/code-mode-turn.jsonl', 'utf-8')
+  const snapshot = attributeContext(parseSessionLog(text))
+
+  it('anchors a non-trivial FACT total from real usage', () => {
+    expect(snapshot.factTotalTokens).toBeDefined()
+    // code-mode-turn's LAST assistant/message (seq 252, step 2): inputTokens 117 + cacheRead 6272 + cacheWrite 0
+    expect(snapshot.factTotalTokens).toBe(6389)
+  })
+
+  it('keeps the derived total honest (does not claim to equal the fact total)', () => {
+    expect(snapshot.totalTokens).toBeGreaterThan(0)
+    expect(snapshot.totalTokens).not.toBe(snapshot.factTotalTokens)
+  })
+})
