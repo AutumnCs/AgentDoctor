@@ -23,7 +23,9 @@
 
 - `TokenUsage` 定义（`packages/llm/llm/src/types.ts`）：`inputTokens`（**未缓存输入**）、`outputTokens`、`cacheReadTokens?`、`cacheWriteTokens?`、`reasoningTokens?`。**billed input = inputTokens + cacheReadTokens + cacheWriteTokens**（注释原文："billed input = sum of the three"）。
 - `assistant/message.data.usage` 就是 DSH 报告的 fact，直接落盘在 JSONL 里。
-- 真实 usage 的 fixture：`code-mode-turn`（inputTokens 6152, 有 system-prompt.expected.md + tool-schemas.expected.json）、`both-mode-turn`（10400, 有同样两个文件）。
+- 真实 usage 的 fixture：`code-mode-turn`（**fact anchor = 6389**，见下）、`both-mode-turn`（10400, 有同样两个文件）。
+- **`code-mode-turn` 有 2 个 `assistant/message` 事件**：seq 188（step 1）usage = `{inputTokens:6152, cacheReadTokens:0}`，seq 252（step 2，最后一个）usage = `{inputTokens:117, cacheReadTokens:6272}`。billed = inputTokens + cacheReadTokens + cacheWriteTokens，所以 fact 总量锚定值是 **6389**（117 + 6272 + 0），**不是** 6152（那是第一个 message 的 billed）。
+- `tool-schemas.expected.json` 是对象 `{initial: [...], changes: []}`，**不是裸数组**；de-redact 时 splice 的是 `sidecar['initial']`，不是整个文件内容。`system-prompt.expected.md` 里也含一个 `{{cwd}}` 占位符，同样要替换。
 - `bash-tool-turn` 有真实 usage 但**无**配套 de-redacted 文件（只有 input.json + stdout），不选它。
 - 语义分项在落盘 log 里**不存在**（只有 token-meter 运行时服务能算，但那是 runtime-only，不接）。
 
@@ -84,21 +86,23 @@ python - <<'PY'
 import json
 p = 'test/fixtures/code-mode-turn.jsonl'
 lines = open(p, encoding='utf-8').read().split('\n')
-sys_prompt = open('/g/deepseek-harness/examples/acp-agent/tests/snapshots/code-mode-turn/system-prompt.expected.md', encoding='utf-8').read()
-tools = open('/g/deepseek-harness/examples/acp-agent/tests/snapshots/code-mode-turn/tool-schemas.expected.json', encoding='utf-8').read()
+sidecar = '/g/deepseek-harness/examples/acp-agent/tests/snapshots/code-mode-turn'
+sys_prompt = open(sidecar + '/system-prompt.expected.md', encoding='utf-8').read()
+tools = json.load(open(sidecar + '/tool-schemas.expected.json', encoding='utf-8'))
+tools_json = json.dumps(tools['initial'])  # tool-schemas.expected.json is {initial: [...], changes: []}, NOT a raw array
 out = []
 for line in lines:
     if '"{{system}}"' in line:
         line = line.replace('"{{system}}"', json.dumps(sys_prompt))
     if '"{{tools}}"' in line:
-        line = line.replace('"{{tools}}"', tools)
-    line = line.replace('{{cwd}}', 'G:/AgentDoctor')
+        line = line.replace('"{{tools}}"', tools_json)
+    line = line.replace('{{cwd}}', 'G:/AgentDoctor')  # also hits the one {{cwd}} inside system_prompt
     out.append(line)
 open(p, 'w', encoding='utf-8').write('\n'.join(out))
 PY
 python -c "import json; [json.loads(l) for l in open('test/fixtures/code-mode-turn.jsonl', encoding='utf-8') if l.strip()]"
 ```
-Expected: 无异常，无 `{{` 残留，所有行合法 JSON。
+Expected: 无异常，无 `{{` 残留，所有行合法 JSON，最后一行 `assistant/message` 的 billed = 6389。
 
 - [ ] **Step 4: 写失败测试（断言 fact 总量在真实 usage fixture 上正确）**
 
@@ -111,8 +115,8 @@ describe('attributeContext on real-usage fixture', () => {
 
   it('anchors a non-trivial FACT total from real usage', () => {
     expect(snapshot.factTotalTokens).toBeDefined()
-    // code-mode-turn's last assistant/message: inputTokens 6152 + cacheRead 0 + cacheWrite 0
-    expect(snapshot.factTotalTokens).toBe(6152)
+    // code-mode-turn's LAST assistant/message (seq 252, step 2): inputTokens 117 + cacheRead 6272 + cacheWrite 0
+    expect(snapshot.factTotalTokens).toBe(6389)
   })
 
   it('keeps the derived total honest (does not claim to equal the fact total)', () => {
@@ -128,7 +132,7 @@ Expected: FAIL — `snapshot.factTotalTokens` is undefined (field doesn't exist 
 - [ ] **Step 5: 跑测试确认通过**
 
 Run: `cd /g/AgentDoctor && npx vitest run test/context-attribution.test.ts`
-Expected: PASS — factTotalTokens === 6152 on the real fixture; the advanced-toolchain tests still pass (factTotalTokens === 3).
+Expected: PASS — factTotalTokens === 6389 on the real fixture; the advanced-toolchain tests still pass (factTotalTokens === 3).
 
 - [ ] **Step 6: 跑全量 + typecheck + commit**
 
@@ -177,7 +181,7 @@ git commit -m "feat: anchor FACT token total from usage; add real-usage fixture"
 - [ ] **Step 2: 跑 demo 验证输出**
 
 Run: `cd /g/AgentDoctor && npx tsx src/demo.ts test/fixtures/code-mode-turn.jsonl`
-Expected: 输出 fact total 6152、derived total（不同于 6152）、四类 derived 分项、以及差异说明。
+Expected: 输出 fact total 6389、derived total（不同于 6389）、四类 derived 分项、以及差异说明。
 
 - [ ] **Step 3: 跑全量 + commit**
 
