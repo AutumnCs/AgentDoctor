@@ -100,32 +100,42 @@ stable `pluginId`-based verbs (`define`/`run`/`stop`/`undefine`).
 
 ### The rule
 
-The rule scans `cordis_*` tool/call events, normalizes verbs via `classifyCordisCall`,
-resolves each `define`'s `pluginId` from its paired `tool/result` (match by `callId`, then
-read `data.meta.pluginId`), and emits two kinds of findings:
+The rule matches the four current-vocabulary tool names directly
+(`cordis_define`/`cordis_run`/`cordis_stop`/`cordis_undefine`). It does **not** use
+`classifyCordisCall`, which collapses legacy `cordis_mount`→`run` and
+`cordis_unmount`→`stop` and would silently re-admit the legacy verbs that have no stable
+`pluginId`. Legacy `cordis_mount`/`cordis_unmount`/`cordis_inspect*` are ignored.
 
-- **A. rollback on ghost** — a `cordis_stop`/`cordis_undefine` whose `pluginId` was never
-  `define`d in this session. `truthLevel: derived` ("never defined this session" is fact;
-  "does not exist" is derived — it may come from a prior session), `severity: warning`.
-  Strongest deterministic error signal. **Wording must distinguish the fact from the
-  inference** (see presentation contract): the sentence asserts the fact ("was never
-  defined in this session") and hedges the inference ("may not exist").
-- **B. unclosed mutation** — a `cordis_run` with no matching `stop`/`undefine` for the same
-  `pluginId` later in the session, i.e. still running at session end. `truthLevel: derived`,
+The rule maintains two session-scoped sets and emits two kinds of findings:
+
+- `exists` — pluginIds seen this session via a `define`'s resolved result-id **or** a
+  `run`'s args-id. (A plugin that was `run` obviously exists even if its `define` was
+  cross-session.)
+- `running` — pluginIds `run` this session with no later `stop`/`undefine` (maps id → run seq).
+
+- **A. rollback on ghost** — a `cordis_stop`/`cordis_undefine` whose `pluginId` is not in
+  `exists` (never defined **or** run this session). `truthLevel: derived` ("never seen this
+  session" is fact; "does not exist" is derived — it may come from a prior session),
+  `severity: warning`. Strongest deterministic error signal. **Wording must distinguish the
+  fact from the inference** (see presentation contract): the sentence asserts the fact
+  ("was never defined or run in this session") and hedges the inference ("may not exist").
+- **B. unclosed mutation** — a `cordis_run` still in `running` at session end (no matching
+  `stop`/`undefine` for the same `pluginId` later). `truthLevel: derived`,
   `severity: info`, wording honestly notes "may be intentional persistence" and that the
   signal is "still running at session end", not "leaked" (we do not know intent).
 
 `cordis_define` alone does not raise a finding (record-only, small blast radius), but it
-contributes to the "defined this session" set used by A. `cordis_stop`/`cordis_undefine`
-also clear the "unclosed" set for B. The rule never emits "this mutation caused a
-slowdown" — that is the Caused fake-causality DESIGN.md forbids.
+contributes to `exists`. `cordis_stop`/`cordis_undefine` remove from `running`. The rule
+never emits "this mutation caused a slowdown" — that is the Caused fake-causality DESIGN.md
+forbids.
 
 ### Identity-resolution edge case
 
 If a `cordis_define` has no paired `tool/result` carrying `meta.pluginId` (missing or
-malformed), that define contributes no `pluginId` to the "defined" set — a later
-`stop`/`undefine` of an unknown id still raises A (honest: we did not see it defined), and
-this is not a crash.
+malformed), that define contributes no `pluginId` to `exists` — a later `stop`/`undefine`
+of an unknown id still raises A (honest: we did not see it defined), and this is not a
+crash. A `run` always contributes its args `pluginId` to `exists` regardless, since the id
+is in the call itself.
 
 ## 5. Self-manufactured bad session (known truth)
 
