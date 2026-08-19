@@ -7,8 +7,8 @@ describe('runtime mutation risk rule', () => {
   const bad = runtimeMutationRiskRule.analyze(parseSessionLog(
     readFileSync('test/fixtures/runtime-mutation-risk.jsonl', 'utf-8')))
 
-  it('reports exactly two findings', () => {
-    expect(bad).toHaveLength(2)
+  it('reports exactly one finding (only the ghost rollback)', () => {
+    expect(bad).toHaveLength(1)
   })
 
   it('flags a rollback on a plugin never defined or run this session (ghost-1)', () => {
@@ -20,13 +20,9 @@ describe('runtime mutation risk rule', () => {
     expect(ghosts[0].evidence.some(e => e.summary.includes('ghost-1'))).toBe(true)
   })
 
-  it('flags a mutation left running at session end (repo-1)', () => {
+  it('does not emit an unclosed-mutation finding (that is noise, not signal)', () => {
     const unclosed = bad.filter(f => f.title === 'unclosed mutation')
-    expect(unclosed).toHaveLength(1)
-    expect(unclosed[0].severity).toBe('info')
-    expect(unclosed[0].truthLevel).toBe('derived')
-    expect(unclosed[0].evidence.some(e => e.seq === 102)).toBe(true)
-    expect(unclosed[0].evidence.some(e => e.summary.includes('repo-1'))).toBe(true)
+    expect(unclosed).toHaveLength(0)
   })
 
   it('does not flag the balanced run-then-stop of insp-1', () => {
