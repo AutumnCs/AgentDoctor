@@ -1,87 +1,107 @@
 # Agent Doctor
 
-**`git` for your agent** — a diagnostic tool for [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) that translates its strong observability from *"can see"* into *"can understand"*.
+**`git` for your agent** — a diagnostic tool for [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) (DSH) that turns its raw observability into something a developer can actually *trust* and *understand*.
 
-Self-modifying agents change their own runtime — registering plugins, tools, listeners, and prompt contributions on the fly. When one of those changes makes the agent slower, dumber, or more expensive, nothing today tells you *what changed* or *why your context exploded*. Agent Doctor rebuilds that story from the agent's own session log, the way `git log` and `git diff` reconstruct a codebase's history.
+Self-modifying agents change their own runtime — registering plugins, tools, and listeners on the fly. When one of those changes goes wrong, nothing today tells you *what changed* and *whether it actually took effect*. Agent Doctor rebuilds that story from the agent's own session log, the way `git log` and `git diff` reconstruct a codebase's history — **and every claim points back at the raw log line that proves it.**
 
+## The core idea
+
+Most agent tools give you *more data* or *an LLM's summary*. Agent Doctor gives you neither. It gives you **deterministic, evidence-backed findings**:
+
+- It **never invents** an explanation. It reports only what the log says.
+- Every conclusion is tagged with a truth level (`fact` / `derived` / `hypothesis` / `unknown`).
+- When the log can't answer, the answer is *"unknown"* — not a confident-sounding guess.
+
+The point is to restore a developer's **judgment** over an agent that is increasingly modifying itself. You can verify every claim, because each one links to the exact event (`seq`) that produced it.
+
+## What it catches (real example)
+
+In a real DSH session, an agent set out to register a new tool called `greet`. It ran the plugin, then spent six steps debugging why the tool never showed up. The bug: `ctx.effect(() => dispose())` runs `dispose()` immediately, so the tool was unregistered the instant it registered.
+
+Agent Doctor surfaces that in one line, with evidence:
+
+```bash
+$ npx tsx src/cli.ts diagnose session.jsonl
+
+[warning] [derived] Run activated but tool did not register
+  Plugin 'grx-1' was run, but its declared tool(s) 'greet' did not appear in
+  the tool list immediately after activation — the tool was not visible then
+  (registration may have failed or been reverted).
+  evidence: seq 6525 (tool/call) — cordis_run of 'grx-1'
+  evidence: seq 6621 (tool/result) — tool list after run is missing 'greet'
 ```
-$ npm run demo
 
-╔══════════════════════════════════════╗
-║  Agent Doctor — demo (SAMPLE DATA)   ║
-╚══════════════════════════════════════╝
+And it shows the full evolution as a `git diff`-style story:
 
-Session: 11111111-1111-4111-8111-111111111111
-Events:  75
+```bash
+$ npx tsx src/cli.ts evolve session.jsonl
 
-── Runtime snapshots ──
-3 snapshots (revision 0 → 2)
+Agent tool-surface evolution (declared vs observed)
 
-rev 0 → 1
-  + Snapshot Marker (dynamic)
-
-rev 1 → 2
-  - Snapshot Marker (dynamic)
-
-── Context attribution (estimate) ──
-total ~51256 tokens (estimated)
-  system         ~30048 (derived)
-  tool-schema    ~19396 (derived)
-  tool-result    ~774 (derived)
-  messages       ~1038 (derived)
+rev 6437  define  grx-1
+          declares tool(s): 'greet'
+rev 6525  run     grx-1/pkg-1
+          ~ tool 'greet'  declared but not visible in snapshot @6621 (may have failed to register, been reverted, or not been a DSL-shaped tool)
+rev 11498 define  grx-1
+          declares tool(s): 'greet'
+rev 11578 run     grx-1/pkg-2
+          + tool 'greet'  (observed in snapshot @11634)
 ```
 
-## Why this exists
-
-DeepSeek Harness is remarkable for how *observable* it is: every turn, step, tool call, and runtime mutation is already recorded in an event-sourced session log. But observability is the raw material, not the answer. When an agent regresses, the existing tools show you the data and leave you to stare at it.
-
-Agent Doctor is the layer that answers the actual questions:
-
-- **What changed?** — `runtime diff` rebuilds the agent's runtime topology over time, showing each plugin/tool added or removed as a `git diff`-style change.
-- **Why is my context this large?** — `context attribution` breaks the context down into system, tool-schema, tool-result, and messages, so the one oversized browser result doesn't hide inside a single "176K" number.
-
-## Design principles
-
-These are non-negotiable — they're what makes the tool *trustworthy* rather than merely pretty:
-
-1. **Diagnosis-first, not dashboard-first.** Every feature exists to answer a concrete question. If something can only be *drawn* but can't help you *understand*, it doesn't ship.
-2. **The session log is the single source of truth.** Agent Doctor never writes to it, never invents events, and every conclusion can be reconstructed from it.
-3. **Truthfulness over confidence.** Every number is tagged with a truth level — `fact`, `derived`, `hypothesis`, or `unknown`. Estimates are labeled `~estimated`, never presented as exact. If the data can't answer, the answer is *Unknown*, not a guess dressed up as a number.
-4. **Evidence-first.** Every diagnosis links to the raw evidence behind it, so you can always verify the tool instead of trusting it.
-
-The full rationale, data-source map, and product loop live in [DESIGN.md](DESIGN.md).
+The `~` line is the finding: the agent *claimed* to add `greet`, but the tool list that followed showed it absent.
 
 ## Quick start
 
 ```bash
 npm install
-npm run demo   # print a sample runtime diff + context attribution
-npm test       # run the unit test suite
+
+# Diagnose a session (run all rules, print findings with evidence)
+npx tsx src/cli.ts diagnose <session.jsonl>
+
+# Show the agent's tool-surface evolution, declared vs observed
+npx tsx src/cli.ts evolve <session.jsonl>
+
+# List registered rules
+npx tsx src/cli.ts rules
+
+npm test   # run the unit test suite (33 tests)
 ```
 
-> **Requires Node 18+** (ESM, `Array.prototype.at`, `tsx` + `vitest` 2.x).
+> **Requires Node 18+.** DSH stores sessions as zstd-compressed JSONL (`*.jsonl.zstd`); decompress with `zstd -d` before passing the `.jsonl` to the CLI.
 
-## What works today (Phase 0)
+## Design principles
 
-This is a **spike**, not a product. It proves the two hardest, highest-value capabilities on real DeepSeek Harness data:
+These are non-negotiable — they're what makes the tool *trustworthy* rather than merely pretty:
+
+1. **Diagnosis-first, not dashboard-first.** Every feature answers a concrete question. If something can only be *drawn* but can't help you *understand*, it doesn't ship.
+2. **The session log is the single source of truth.** Agent Doctor never writes to it, never invents events, and every conclusion can be reconstructed from it.
+3. **Truthfulness over confidence.** Every number and claim is tagged with a truth level. Estimates are labeled, never presented as exact. If the data can't answer, the answer is *Unknown*.
+4. **Evidence-first.** Every finding links to the raw event (`seq`) behind it, so you can always verify the tool instead of trusting it.
+
+## What works today
 
 | Capability | Status | What it does |
 | --- | --- | --- |
-| **runtime diff** | ✅ | Rebuilds runtime snapshots from `cordis_*` tool calls and diffs them (`+`/`-` nodes) |
-| **context attribution** | ✅ | Breaks context into system / tool-schema / tool-result / messages, all labeled as estimates |
-| Session log parser | ✅ | Reads DSH's JSONL session format, fault-tolerant and read-only |
-| Cordis verb normalization | ✅ | Data-driven mapping of DSH's self-modification verbs (`cordis_mount`/`unmount` legacy ↔ `cordis_define`/`run`/`stop`/`undefine` current) |
+| **`diagnose`** | ✅ | Runs rules and prints findings with evidence, tagged by truth level |
+| **`evolve`** | ✅ | Rebuilds the agent's tool-surface evolution as declared-vs-observed diffs |
+| `run-but-not-registered` rule | ✅ | Flags a run whose declared tool never appeared (validated on a real session) |
+| `runtime-mutation-risk` rule | ✅ | Flags stop/undefine on a plugin never defined/run this session |
+| Session log parser | ✅ | Reads DSH's JSONL format (including zstd-compressed), read-only and fault-tolerant |
+| Context attribution | ✅ | Breaks context into system/tool-schema/tool-result/messages; `factTotalTokens` anchored on DSH-reported usage |
+
+## Honest boundaries
+
+This tool is honest about what the data *can't* tell you:
+
+- **The on-disk log has no tool-level topology.** It records plugin-level lifecycle (`define`/`run`/`stop`/`undefine`), but not "which specific tools a plugin registered." Tool names are therefore **recovered heuristically** from the plugin's `defineTool({ name: ... })` code (DSH's DSL shape), not parsed from the real runtime. A tool registered any other way is missed — that's under-reporting, never wrong-reporting.
+- **"Not visible in the snapshot" ≠ "failed to register."** The wording deliberately hedges: a tool absent from one `listTools` snapshot could have failed, been reverted, or been mistimed. The finding says "may have", never "did".
+- **These are `derived` findings, not `fact`.** Only the raw `usage` totals from DSH's `assistant/message` events are `fact`; everything reconstructed from the log is `derived`.
 
 ## What's deliberately not here yet
 
-- **Real token counts.** Context attribution currently estimates tokens from content length (`chars / 1.5`). Wiring DSH's `tokenMeter` for authoritative `totalTokens` is the next milestone.
-- **A UI.** The output is terminal text today. A git-diff-style visual interface is planned.
-- **Doctor Chat / natural-language Q&A.** The data layer comes first; an LLM that explains it comes after, and will never be the source of truth.
-- **Compilation to a published binary.** `npm run demo` runs via `tsx`; the `bin` entry points at `lib/demo.js`, which isn't built yet.
-
-## Honesty about the numbers
-
-The demo's `~30048` system tokens are an *estimate*, not what DeepSeek's token meter reported. They're trustworthy for **magnitude and trend** — "the system prompt is the largest contributor, by far" — but not for **fine-grained comparison** ("this tool result is 1 token larger than that one"). When two estimates are close, the honest answer is "roughly equal," not a forced ranking.
+- **A visual UI.** Output is terminal text. A git-diff-style visual interface (red/green for added/removed) is the planned next step.
+- **Doctor Chat / natural-language Q&A.** An LLM that explains findings may come later, but it will **never** be the source of truth — it would only rephrase what the deterministic rules already established.
+- **More rules.** The existing rules came from real failure sessions. New rules need new real failure sessions to mine — no synthetic scenarios.
 
 ## Repository layout
 
@@ -89,19 +109,23 @@ The demo's `~30048` system tokens are an *estimate*, not what DeepSeek's token m
 src/
   session-log.ts          # parse DSH session JSONL → events
   cordis-verbs.ts         # data-driven normalization of cordis self-modification verbs
-  runtime-snapshot.ts     # rebuild runtime topology snapshots
-  runtime-diff.ts         # git-style diff between snapshots
-  context-attribution.ts  # attribute context composition (system/messages/tool-result/tool-schema)
+  cordis-tools.ts         # shared helpers: declare/observe, tool-name extraction, snapshots
+  rules/                  # one file per diagnosis rule
+    runtime-mutation-risk.ts
+    run-but-not-registered.ts
+  diagnosis.ts            # rule registry + runDiagnosis
+  evolution.ts            # declared-vs-observed tool-surface rendering
+  context-attribution.ts  # context composition (fact total + derived categories)
+  cli.ts                  # diagnose / evolve / rules entry point
   truth-level.ts          # the fact/derived/hypothesis/unknown taxonomy
   types.ts                # core domain types
-  demo.ts                 # the demo entry point
 test/
   fixtures/               # real DSH session logs (de-redacted)
 ```
 
 ## Status
 
-Phase 0 spike. Not yet a stable API — interfaces may change as real token data and the UI land. Contributions and feedback welcome; open an issue first to align on scope.
+Early, but **not a toy**: the core capability — catching a real self-modification bug with evidence — is validated against a real DeepSeek Harness session. The public API (finding shapes, rule interface) may still change. Contributions and feedback welcome; open an issue first to align on scope.
 
 ## License
 
