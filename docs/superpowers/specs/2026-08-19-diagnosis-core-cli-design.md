@@ -109,6 +109,13 @@ New fixture `test/fixtures/runtime-mutation-risk.jsonl`, hand-written with a kno
 Test asserts the findings contain **exactly** A (evidence pointing at ghost_tool's stop
 seq) and B (evidence pointing at repo-reviewer's run seq), and nothing for inspect_pr.
 
+**Honest boundary:** this proves the rule's *logic* is correct — it finds the patterns we
+deliberately planted and does not false-positive on the clean case. It does **not** prove
+those patterns are real-world DSH failure modes worth surfacing. The `ghost_tool` /
+`unclosed repo-reviewer` scenarios are our hypotheses about what a bad session looks like;
+validating them against a real, human-verified bad session remains open (no such session
+exists yet). The design claims correctness of mechanism, not proven production usefulness.
+
 ## 6. CLI
 
 Reuses git vocabulary but only two minimal subcommands, parsed from `process.argv`
