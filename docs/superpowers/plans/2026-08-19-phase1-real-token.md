@@ -86,7 +86,7 @@ python - <<'PY'
 import json
 p = 'test/fixtures/code-mode-turn.jsonl'
 lines = open(p, encoding='utf-8').read().split('\n')
-sidecar = '/g/deepseek-harness/examples/acp-agent/tests/snapshots/code-mode-turn'
+sidecar = 'G:/deepseek-harness/examples/acp-agent/tests/snapshots/code-mode-turn'  # Windows path — Python open() does not understand the /g/ Git-Bash mount
 sys_prompt = open(sidecar + '/system-prompt.expected.md', encoding='utf-8').read()
 tools = json.load(open(sidecar + '/tool-schemas.expected.json', encoding='utf-8'))
 tools_json = json.dumps(tools['initial'])  # tool-schemas.expected.json is {initial: [...], changes: []}, NOT a raw array
