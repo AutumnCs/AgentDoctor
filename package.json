@@ -2,7 +2,6 @@
   "name": "agent-doctor",
   "version": "0.1.0",
   "type": "module",
-  "bin": { "agent-doctor": "lib/demo.js" },
   "scripts": {
     "test": "vitest run",
     "typecheck": "tsc --noEmit",

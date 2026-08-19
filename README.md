@@ -1,8 +1,8 @@
 # Agent Doctor
 
-**`git` for your agent** — a diagnostic tool for [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) (DSH) that turns its raw observability into something a developer can actually *trust* and *understand*.
+**Agent Doctor** is an experimental, read-only diagnostic tool for [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) (DSH). It turns selected session-log evidence about self-modifying plugins into findings a developer can inspect and verify.
 
-Self-modifying agents change their own runtime — registering plugins, tools, and listeners on the fly. When one of those changes goes wrong, nothing today tells you *what changed* and *whether it actually took effect*. Agent Doctor rebuilds that story from the agent's own session log, the way `git log` and `git diff` reconstruct a codebase's history — **and every claim points back at the raw log line that proves it.**
+Self-modifying agents change their own runtime — registering plugins, tools, and listeners on the fly. When one of those changes goes wrong, Agent Doctor can reconstruct a small, evidence-backed part of that story from the agent's session log. It is closer to a DSH session linter/forensic helper than a general-purpose debugging platform.
 
 ## The core idea
 
@@ -12,7 +12,7 @@ Most agent tools give you *more data* or *an LLM's summary*. Agent Doctor gives 
 - Every conclusion is tagged with a truth level (`fact` / `derived` / `hypothesis` / `unknown`).
 - When the log can't answer, the answer is *"unknown"* — not a confident-sounding guess.
 
-The point is to restore a developer's **judgment** over an agent that is increasingly modifying itself. You can verify every claim, because each one links to the exact event (`seq`) that produced it.
+The point is to support a developer's **judgment** over an agent that is modifying itself. Each finding includes the event sequence (`seq`) behind it. The current HTML view displays those pointers; it does not yet open the raw event inline.
 
 ## What it catches (real example)
 
@@ -61,10 +61,13 @@ npx tsx src/cli.ts diagnose <session.jsonl>
 # Show the agent's tool-surface evolution, declared vs observed
 npx tsx src/cli.ts evolve <session.jsonl>
 
+# Write a self-contained HTML version of the evolution view
+npx tsx src/cli.ts view <session.jsonl> [out.html]
+
 # List registered rules
 npx tsx src/cli.ts rules
 
-npm test   # run the unit test suite (33 tests)
+npm test   # run the unit test suite (32 tests)
 ```
 
 > **Requires Node 18+.** DSH stores sessions as zstd-compressed JSONL (`*.jsonl.zstd`); decompress with `zstd -d` before passing the `.jsonl` to the CLI.
@@ -84,9 +87,10 @@ These are non-negotiable — they're what makes the tool *trustworthy* rather th
 | --- | --- | --- |
 | **`diagnose`** | ✅ | Runs rules and prints findings with evidence, tagged by truth level |
 | **`evolve`** | ✅ | Rebuilds the agent's tool-surface evolution as declared-vs-observed diffs |
+| **`view`** | ✅ | Writes a self-contained HTML rendering of the evolution view |
 | `run-but-not-registered` rule | ✅ | Flags a run whose declared tool never appeared (validated on a real session) |
 | `runtime-mutation-risk` rule | ✅ | Flags stop/undefine on a plugin never defined/run this session |
-| Session log parser | ✅ | Reads DSH's JSONL format (including zstd-compressed), read-only and fault-tolerant |
+| Session log parser | ✅ | Reads DSH JSONL text, read-only and fault-tolerant; decompress `.jsonl.zstd` before passing it to the CLI |
 | Context attribution | ✅ | Breaks context into system/tool-schema/tool-result/messages; `factTotalTokens` anchored on DSH-reported usage |
 
 ## Honest boundaries
@@ -97,11 +101,11 @@ This tool is honest about what the data *can't* tell you:
 - **"Not visible in the snapshot" ≠ "failed to register."** The wording deliberately hedges: a tool absent from one `listTools` snapshot could have failed, been reverted, or been mistimed. The finding says "may have", never "did".
 - **These are `derived` findings, not `fact`.** Only the raw `usage` totals from DSH's `assistant/message` events are `fact`; everything reconstructed from the log is `derived`.
 
-## What's deliberately not here yet
+## Current scope and limits
 
-- **A visual UI.** Output is terminal text. A git-diff-style visual interface (red/green for added/removed) is the planned next step.
+- **A full visual debugger.** `view` is a small self-contained HTML rendering of the same evolution data; it is not an interactive raw-event browser.
 - **Doctor Chat / natural-language Q&A.** An LLM that explains findings may come later, but it will **never** be the source of truth — it would only rephrase what the deterministic rules already established.
-- **More rules.** The existing rules came from real failure sessions. New rules need new real failure sessions to mine — no synthetic scenarios.
+- **More rules.** The existing rules came from a small number of real or known-truth sessions. New rules need more real failure sessions to mine — no synthetic scenarios.
 
 ## Repository layout
 
@@ -125,7 +129,7 @@ test/
 
 ## Status
 
-Early, but **not a toy**: the core capability — catching a real self-modification bug with evidence — is validated against a real DeepSeek Harness session. The public API (finding shapes, rule interface) may still change. Contributions and feedback welcome; open an issue first to align on scope.
+Early experimental software: the core capability — catching one real self-modification bug with evidence — is validated against a DeepSeek Harness session. The public API (finding shapes, rule interface, and CLI packaging) may still change. It is currently aimed at DSH developers who already have a session log, not at first-time agent users.
 
 ## License
 
