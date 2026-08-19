@@ -1,7 +1,8 @@
-import { readFileSync } from 'node:fs'
+import { readFileSync, writeFileSync } from 'node:fs'
 import { parseSessionLog } from './session-log.js'
 import { RULES, runDiagnosis } from './diagnosis.js'
 import { renderEvolution } from './evolution.js'
+import { renderEvolutionHtml } from './render-html.js'
 import type { Finding } from './types.js'
 
 const SEVERITY_ORDER: Record<Finding['severity'], number> = { critical: 0, warning: 1, info: 2 }
@@ -76,7 +77,33 @@ function main(): void {
     return
   }
 
-  console.error('usage: npx tsx src/cli.ts <diagnose <session.jsonl> | evolve <session.jsonl> | rules>')
+  if (cmd === 'view') {
+    if (!arg) {
+      console.error('usage: npx tsx src/cli.ts view <session.jsonl> [out.html]')
+      process.exit(1)
+    }
+    const [sessionPath, outPath] = [arg, process.argv[4]]
+    let text: string
+    try {
+      text = readFileSync(sessionPath, 'utf-8')
+    } catch {
+      console.error(`error: cannot read ${sessionPath}`)
+      process.exit(1)
+    }
+    try {
+      const parsed = parseSessionLog(text)
+      const html = renderEvolutionHtml(parsed)
+      const out = outPath ?? `${sessionPath.replace(/\.(jsonl|json)$/, '')}.html`
+      writeFileSync(out, html, 'utf-8')
+      console.log(`wrote ${out}`)
+    } catch (err) {
+      console.error(`error: ${err instanceof Error ? err.message : String(err)}`)
+      process.exit(1)
+    }
+    return
+  }
+
+  console.error('usage: npx tsx src/cli.ts <diagnose <session.jsonl> | evolve <session.jsonl> | view <session.jsonl> | rules>')
   process.exit(1)
 }
 
