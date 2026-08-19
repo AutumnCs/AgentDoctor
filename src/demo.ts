@@ -23,14 +23,22 @@ function main(): void {
     console.log(`\nrev ${d.from} → ${d.to}`)
     for (const n of d.added) console.log(`  + ${n.name} (${n.origin})`)
     for (const n of d.removed) console.log(`  - ${n.name} (${n.origin})`)
-    console.log(`  tools: ${d.toolCountDelta >= 0 ? '+' : ''}${d.toolCountDelta}`)
+    // hide the tool-count line until nodes actually carry tool kinds (Phase 0 emits none)
+    if (d.toolCountDelta !== 0) {
+      console.log(`  tools: ${d.toolCountDelta >= 0 ? '+' : ''}${d.toolCountDelta}`)
+    }
   }
 
   const ctx = attributeContext(parsed)
   console.log(`\n── Context attribution (estimate) ──`)
   console.log(`total ~${ctx.totalTokens} tokens (estimated)`)
+  // aggregate per-category for readability; the data layer still keeps per-event granularity
+  const byCategory = new Map<string, number>()
   for (const c of ctx.contributions) {
-    console.log(`  ${c.category.padEnd(14)} ~${c.tokens} (${c.level})`)
+    byCategory.set(c.category, (byCategory.get(c.category) ?? 0) + c.tokens)
+  }
+  for (const [category, tokens] of byCategory) {
+    console.log(`  ${category.padEnd(14)} ~${tokens} (derived)`)
   }
 }
 
