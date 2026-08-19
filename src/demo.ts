@@ -30,15 +30,21 @@ function main(): void {
   }
 
   const ctx = attributeContext(parsed)
-  console.log(`\n── Context attribution (estimate) ──`)
-  console.log(`total ~${ctx.totalTokens} tokens (estimated)`)
-  // aggregate per-category for readability; the data layer still keeps per-event granularity
+  console.log(`\n── Context attribution ──`)
+  if (ctx.factTotalTokens !== undefined) {
+    console.log(`fact total   ~${ctx.factTotalTokens} tokens (DSH reported)`)
+  }
+  console.log(`derived total ~${ctx.totalTokens} tokens (chars/1.5 estimate)`)
+  // aggregate per-category for readability
   const byCategory = new Map<string, number>()
   for (const c of ctx.contributions) {
     byCategory.set(c.category, (byCategory.get(c.category) ?? 0) + c.tokens)
   }
   for (const [category, tokens] of byCategory) {
     console.log(`  ${category.padEnd(14)} ~${tokens} (derived)`)
+  }
+  if (ctx.factTotalTokens !== undefined && ctx.factTotalTokens !== ctx.totalTokens) {
+    console.log(`\nnote: fact total (DSH) and derived sum differ — semantic breakdown is estimated`)
   }
 }
 
