@@ -6,7 +6,9 @@
   "scripts": {
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
-    "demo": "tsx src/demo.ts"
+    "diagnose": "tsx src/cli.ts diagnose",
+    "evolve": "tsx src/cli.ts evolve",
+    "demo": "tsx src/cli.ts evolve test/fixtures/run-but-not-registered.jsonl"
   },
   "devDependencies": {
     "@types/node": "^26.2.0",
