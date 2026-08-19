@@ -47,7 +47,7 @@ interface Evidence {
 
 interface Finding {
   ruleId: string
-  title: string        // e.g. "rollback on unregistered tool"
+  title: string        // e.g. "rollback on unregistered plugin"
   severity: 'info' | 'warning' | 'critical'
   diagnosis: string    // conclusion, one sentence
   truthLevel: TruthLevel   // fact | derived | hypothesis | unknown
