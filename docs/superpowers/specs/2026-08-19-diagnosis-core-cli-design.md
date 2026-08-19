@@ -67,6 +67,13 @@ interface DiagnosisRule {
 "prefer Unknown over fake certainty" lands in code: a finding can be
 `truthLevel: derived, severity: warning` without pretending the derivation is a fact.
 
+**Presentation contract (never mislead):** the `diagnosis` sentence must state, in plain
+English, what is fact and what is inferred — the `truthLevel` tag is a redundant marker,
+not the only honesty signal. A finding must never read as more certain than its
+truthLevel. For a `derived` finding the sentence names the known part and the inferred
+part separately, e.g. "Stopped 'ghost_tool', which was never defined or run in this
+session — it may not exist (possibly cross-session state)."
+
 ## 4. First rule: runtime mutation risk
 
 Only `fact`/`derived` truth levels for now — no `hypothesis` (that would require
@@ -79,9 +86,13 @@ and emits two kinds of findings:
   was never `define`d or `run` in this session. `truthLevel: derived`
   ("never defined this session" is fact; "does not exist" is derived — it may come from a
   prior session), `severity: warning`. Strongest deterministic error signal.
+  **Wording must distinguish the fact from the inference** (see presentation contract):
+  the sentence asserts the fact ("was never defined/run in this session") and hedges the
+  inference ("may not exist").
 - **B. unclosed mutation** — a `cordis_run` with no matching `stop`/`undefine` later in
   the session, i.e. still mounted at session end. `truthLevel: derived`,
-  `severity: info`, wording honestly notes "may be intentional persistence".
+  `severity: info`, wording honestly notes "may be intentional persistence" and that the
+  signal is "still mounted at session end", not "leaked" (we do not know intent).
 
 `cordis_define` alone does not raise a finding (record-only, small blast radius), but it
 contributes to the "defined this session" set used by A. The rule never emits "this
