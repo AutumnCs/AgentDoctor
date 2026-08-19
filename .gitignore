@@ -1,5 +1,7 @@
 node_modules/
 lib/
 .superpowers/
+.claude/
+docs/superpowers/
 *.log
 .tmp-session/
