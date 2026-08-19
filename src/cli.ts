@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { parseSessionLog } from './session-log.js'
 import { RULES, runDiagnosis } from './diagnosis.js'
+import { renderEvolution } from './evolution.js'
 import type { Finding } from './types.js'
 
 const SEVERITY_ORDER: Record<Finding['severity'], number> = { critical: 0, warning: 1, info: 2 }
@@ -53,7 +54,29 @@ function main(): void {
     return
   }
 
-  console.error('usage: npx tsx src/cli.ts <diagnose <session.jsonl> | rules>')
+  if (cmd === 'evolve') {
+    if (!arg) {
+      console.error('usage: npx tsx src/cli.ts evolve <session.jsonl>')
+      process.exit(1)
+    }
+    let text: string
+    try {
+      text = readFileSync(arg, 'utf-8')
+    } catch {
+      console.error(`error: cannot read ${arg}`)
+      process.exit(1)
+    }
+    try {
+      const parsed = parseSessionLog(text)
+      console.log(renderEvolution(parsed))
+    } catch (err) {
+      console.error(`error: ${err instanceof Error ? err.message : String(err)}`)
+      process.exit(1)
+    }
+    return
+  }
+
+  console.error('usage: npx tsx src/cli.ts <diagnose <session.jsonl> | evolve <session.jsonl> | rules>')
   process.exit(1)
 }
 
