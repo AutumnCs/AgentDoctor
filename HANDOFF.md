@@ -19,50 +19,48 @@
 
 ---
 
-## 二、当前代码状态（已提交，14 个测试全过）
+## 二、当前代码状态（已提交，16 个测试全过）
 
 **项目位置**：`G:\AgentDoctor`（独立 TypeScript 工程，不碰 DSH monorepo `G:\deepseek-harness`，两者分离保证"稳"）。
 
-**已实现的能力**（Phase 0 + Phase 0.5 完成）：
+**已实现的能力**（Phase 0 + Phase 0.5 + **Phase 1** 完成）：
 - `src/session-log.ts` — 解析 DSH session JSONL（真实落盘格式）→ 事件流
 - `src/cordis-verbs.ts` — 数据驱动映射 cordis 自进化动词（`cordis_mount/unmount` 旧 ↔ `cordis_define/run/stop/undefine` 新，含 `inspect_self/query` 变体）
 - `src/runtime-snapshot.ts` + `runtime-diff.ts` — 从 cordis tool/call 重建 runtime 拓扑快照并做 git 风格 diff
-- `src/context-attribution.ts` — 归因 context 构成（system / messages / tool-result / tool-schema 四类）
+- `src/context-attribution.ts` — 归因 context 构成（system / messages / tool-result / tool-schema 四类），**Phase 1 起同时锚定 fact 总量（`factTotalTokens`，来自 usage）**
 - `src/truth-level.ts` + `types.ts` — 唯一 TruthLevel 类型 + 核心领域类型
-- `src/demo.ts` — `npm run demo` 入口
+- `src/demo.ts` — `npm run demo` 入口（Phase 1 起展示 fact vs derived 对比）
 
-**测试**：`test/` 下 14 个测试全过，`npx tsc --noEmit` 无错。fixture 在 `test/fixtures/`（`advanced-toolchain.jsonl` 是当前 demo 用的真实 DSH 落盘格式数据）。
+**测试**：`test/` 下 16 个测试全过，`npx tsc --noEmit` 无错。fixture 在 `test/fixtures/`（`advanced-toolchain.jsonl` 是 Phase 0 用的，`code-mode-turn.jsonl` 是 Phase 1 新增的真实 usage 数据，fact anchor = 6389）。
 
 **仓库**：已推到 `https://github.com/AutumnCs/AgentDoctor`，main 分支。README 已按开源风格重写（含真实 demo 输出、诚实标注、MIT LICENSE）。
 
 ---
 
-## 三、正在做的事（被中断的位置——最重要）
+## 三、Phase 1 已完成（Real Token Attribution）✅
 
-### Phase 1：Real Token Attribution（真 token 归因）
+**Phase 1：Real Token Attribution（真 token 归因）已完成并提交**，最终 review 通过（`16/16` 测试 + `tsc --noEmit` 干净 + 工作树干净）。
 
 **目标**：把 context attribution 从"纯 `chars/1.5` 估算"升级为"锚定 DSH 真实报告的 fact 总量 + 按比例分摊的 derived 分项"。
 
-**计划**：`docs/superpowers/plans/2026-08-19-phase1-real-token.md`（已提交，commit `a1db239`）
+**落地内容**：
+- `src/types.ts` — `ContextSnapshot` 增加可选 `factTotalTokens?: number`
+- `src/context-attribution.ts` — `attributeContext` 从**最后一个** `assistant/message` 的 `usage` 提取 billed input（`inputTokens + cacheReadTokens + cacheWriteTokens`），只在有 usage 时出现该字段
+- `src/demo.ts` — 输出 fact total（DSH reported）+ derived total（chars/1.5 estimate）+ 四类 derived 分项 + fact≠derived 时的差异说明
+- `test/context-attribution.test.ts` — 新增真实 usage fixture 的断言（factTotalTokens === 6389）
+- `test/fixtures/code-mode-turn.jsonl` — 新 fixture（38 行、已 de-redact、无 `{{}}` 占位符）
 
-**SDD 进度**：Subagent-Driven Development 进行中，ledger 在 `.superpowers/sdd/2026-08-19-phase1-real-token/progress.md`（但 `.superpowers/` 在 .gitignore 里，不提交，需注意它可能已随磁盘清理丢失——见下文）。
+**关键事实（别再踩坑）**：
+- `code-mode-turn` 有 2 个 assistant/message：seq 188 billed=6152（第一个），seq 252 billed=**6389**（最后一个，即 fact 锚定值 = 117 + 6272 + 0）。
+- **billed input = inputTokens + cacheReadTokens + cacheWriteTokens**（inputTokens 只是"未缓存输入"）。
+- `tool-schemas.expected.json` 是对象 `{initial: [...], changes: []}`，de-redact 用 `json.dumps(sidecar['initial'])`；`system-prompt.expected.md` 里也含一个 `{{cwd}}` 占位符要替换。
+- de-redact 脚本里 Python `open()` 要用 Windows 路径 `G:/...`（不是 Git Bash 的 `/g/...` mount，Python 不认识）。
 
-**Task 1（fact 总量 + fixture）状态：IN PROGRESS，被中断。**
-- 已派出的子 agent 被 kill（因 C 盘满）。
-- **未提交的半成品**：`test/fixtures/code-mode-turn.jsonl` 已复制（64 行、无 `{{` 占位符），但 **de-redaction 未完成**——最后一行 JSON 解析失败，是坏文件，需要重做。
-- `src/types.ts` / `src/context-attribution.ts` / `test/context-attribution.test.ts` **尚未改动**（子 agent 在满盘前还没提交）。
+**计划文件**：`docs/superpowers/plans/2026-08-19-phase1-real-token.md`（已修正上述两处错误并提交）。
 
-### 子 agent 被 kill 前留下的两个关键发现（必须记住，否则又会踩坑）
+**SDD ledger**：`.superpowers/sdd/2026-08-19-phase1-real-token/progress.md`（在 .gitignore 里，可能随磁盘清理丢失——但工作已全部落 git，见 commit 列表）。
 
-1. **`code-mode-turn` 有 2 个 assistant/message 事件，不是 1 个**：
-   - seq 188（step 1）：`inputTokens: 6152, cacheReadTokens: 0` → billed = 6152
-   - seq 252（step 2，最后）：`inputTokens: 117, cacheReadTokens: 6272` → billed = **6389**
-   - 所以 fact 总量锚定值是 **6389**，不是计划里写的 6152（6152 是第一个 message）。
-   - **billed input = inputTokens + cacheReadTokens + cacheWriteTokens**（DSH 源码注释明确：inputTokens 是"未缓存输入"，要加 cache 才是计费输入）。
-
-2. **`tool-schemas.expected.json` 是对象 `{initial: [...], changes: []}`，不是裸数组**。de-redact 时必须用 `json.dumps(sidecar['initial'])`，不能直接 splice 整个文件（会破坏 JSONL）。
-
-### Task 2（demo 展示 fact vs derived）状态：pending，未开始。
+**Phase 1 commits**：`7997ea1`（计划修正）、`ad49eed`（路径修正）、`a111be7`（Task 1 实现）、`86581c7`（Task 2 实现）。
 
 ---
 
@@ -98,16 +96,15 @@
 
 ---
 
-## 七、重启后的下一步（建议顺序）
+## 七、下一步（建议顺序）
 
-1. **先读** [DESIGN.md](DESIGN.md)、`docs/superpowers/plans/2026-08-19-phase1-real-token.md`、本 handoff。
-2. **清理**：删除坏掉的半成品 `test/fixtures/code-mode-turn.jsonl`（未完成 de-redaction），重做 Task 1。
-3. **修正计划里的两个错误**（第六节发现）：
-   - fact 总量锚定值从 6152 改为 6389。
-   - de-redact 用 `json.dumps(sidecar['initial'])`。
-4. **继续 Phase 1 Task 1**（fact 总量 + fixture），用 Subagent-Driven 流程。
-5. 完成后做 Task 2，然后 Phase 1 的 final review。
-6. **回到主线**：Phase 1 只是深化"context 为什么这么大"这一条 killer，做完就回到诊断规则（repeated tool failure / compaction thrashing / runtime mutation risk 等）——那是最初目标的核心。
+1. **Phase 1 已做完**，无需再续。当前停在"context 为什么这么大"这条 killer 已被强化（fact 总量 + derived 分项）。
+2. **回到主线**（最初目标的核心）：Phase 1 只是深化了 context 归因这一条，现在回到**诊断规则**——
+   - repeated tool failure（同一工具反复失败）
+   - compaction thrashing（压缩抖动）
+   - runtime mutation risk（runtime 拓扑突变风险）
+   - 其他 DESIGN.md 里规划的诊断规则
+3. 每条诊断规则都遵循同一模式：deterministic rules → diagnosis → evidence → explain（见 DESIGN.md 核心差异化）。
 
 ---
 
