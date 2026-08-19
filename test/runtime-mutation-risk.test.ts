@@ -40,4 +40,16 @@ describe('runtime mutation risk rule', () => {
       readFileSync('test/fixtures/code-mode-turn.jsonl', 'utf-8')))
     expect(clean).toEqual([])
   })
+
+  it('does not flag run-then-stop when the plugin was defined cross-session', () => {
+    // A plugin run this session (its define happened in a prior session) is not a
+    // ghost when later stopped — `run` admits its id to the exists set.
+    const crossSession = [
+      '{"type":"session","version":0,"id":"cross-0001","createdAt":1,"cwd":"G:/AgentDoctor"}',
+      '{"type":"tool/call","seq":1,"time":2,"data":{"turn":1,"step":1,"callId":"run-cross","name":"cordis_run","arguments":"{\\"pluginId\\":\\"cross-1\\",\\"packageId\\":\\"pkg-1\\",\\"mode\\":\\"run\\"}"}}',
+      '{"type":"tool/call","seq":2,"time":3,"data":{"turn":1,"step":2,"callId":"stop-cross","name":"cordis_stop","arguments":"{\\"pluginId\\":\\"cross-1\\"}"}}',
+    ].join('\n')
+    const findings = runtimeMutationRiskRule.analyze(parseSessionLog(crossSession))
+    expect(findings).toEqual([])
+  })
 })
